@@ -1,0 +1,19 @@
+{
+  "target": "Bùi Công Nam",
+  "boards": [
+    {
+      "id": "vanxuan",
+      "title": "Vạn Xuân Awards - Đại sứ thương hiệu được yêu thích nhất",
+      "url": "https://vanxuanawards.1vote.vn/",
+      "click": "",
+      "deadline": "2026-11-30T23:59:00+07:00"
+    },
+    {
+      "id": "maleicon",
+      "title": "Male Icon Awards - Singer & Songwriter of the Year",
+      "url": "https://maleiconawards.1vote.vn/",
+      "section": "Singer & Songwriter of the Year",
+      "deadline": "2026-12-15T20:00:00+07:00"
+    }
+  ]
+}
