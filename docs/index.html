@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Theo dõi vote</title>
+<style>
+  :root {
+    --bg: #f6f4f1; --card: #ffffff; --ink: #1c1917; --muted: #78716c; --line: #e7e2dc;
+    --accent: #b91c1c; --good: #15803d; --warn: #b45309; --me: #fef2f2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14110f; --card: #1f1b18; --ink: #f5f1ec; --muted: #a8a29e; --line: #342e2a;
+            --accent: #f87171; --good: #4ade80; --warn: #fbbf24; --me: #3a1c1c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 system-ui, "Segoe UI", Roboto, sans-serif; }
+  header { padding: 20px 16px 4px; max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .tabs { max-width: 1100px; margin: 12px auto 0; padding: 0 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .tab { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px;
+         padding: 8px 14px; font: inherit; font-size: 14px; cursor: pointer; }
+  .tab b { color: var(--accent); margin-left: 6px; font-variant-numeric: tabular-nums; }
+  .tab.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .tab.on b { color: var(--bg); }
+  main { max-width: 1100px; margin: 0 auto; padding: 12px 16px 48px; }
+  .board { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  .board h2 { font-size: 17px; margin: 0 0 2px; }
+  .meta { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .tile { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .tile b { display: block; font-size: 22px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .tile span { color: var(--muted); font-size: 12px; }
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; min-width: 640px; }
+  th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  th:nth-child(2), td:nth-child(2) { text-align: left; white-space: normal; }
+  tr.me td { background: var(--me); font-weight: 600; }
+  .up { color: var(--good); } .dim { color: var(--muted); } .bad { color: var(--warn); }
+  h3 { font-size: 15px; margin: 22px 0 2px; }
+  canvas { width: 100%; height: 240px; display: block; margin-top: 6px; touch-action: pan-y; cursor: ew-resize; }
+  .slider { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .slider input { flex: 1; accent-color: var(--accent); height: 28px; }
+  .slider button { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 8px;
+                   padding: 5px 10px; font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+  .readout { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; }
+  .rc { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; border-top-width: 3px; }
+  .rc span { color: var(--muted); font-size: 12px; display: block; }
+  .rc b { font-size: 19px; font-variant-numeric: tabular-nums; display: block; line-height: 1.25; }
+  .rc small { font-size: 12px; display: block; font-variant-numeric: tabular-nums; }
+  .rc.me { background: var(--me); }
+  .err { background: #fef3c7; color: #78350f; border-radius: 8px; padding: 8px 12px; font-size: 13px; margin-bottom: 12px; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .cycbox { max-height: 420px; overflow-y: auto; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px;
+            margin-top: 8px; scrollbar-width: thin; scrollbar-color: var(--muted) transparent; }
+  .cycbox::-webkit-scrollbar { width: 10px; height: 10px; }
+  .cycbox::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 6px; border: 2px solid var(--card); }
+  .cycbox::-webkit-scrollbar-track { background: transparent; }
+  table.cyc { min-width: 520px; width: max-content; }
+  table.cyc th:nth-child(2), table.cyc td:nth-child(2) { text-align: right; white-space: nowrap; }
+  table.cyc th.mecol { color: var(--accent); }
+  table.cyc td.mecol { background: var(--me); font-weight: 600; }
+  table.cyc th:first-child, table.cyc td:first-child { position: sticky; left: 0; background: var(--card); z-index: 2; }
+  table.cyc th:first-child { z-index: 3; }
+  table.cyc tr.new td:first-child { background: var(--me); }
+  table.cyc th { position: sticky; top: 0; background: var(--card); z-index: 1; box-shadow: 0 1px 0 var(--line); }
+  table.cyc th:first-child, table.cyc td:first-child { text-align: left; }
+  table.cyc td small { display: block; font-size: 11px; line-height: 1.2; }
+  table.cyc tr.new td { background: var(--me); }
+  table.cyc tr:last-child td { border-bottom: 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Theo dõi vote</h1>
+  <div class="sub" id="status">Đang tải…</div>
+</header>
+<div class="tabs" id="tabs"></div>
+<main id="boards"></main>
+
+<script>
+const COLORS = ["#dc2626", "#2563eb", "#16a34a", "#d97706"];
+const fmt = n => n == null ? "–" : Math.round(n).toLocaleString("vi-VN");
+const sgn = n => n == null ? "–" : (n >= 0 ? "+" : "") + Math.round(n).toLocaleString("vi-VN");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pad = n => String(n).padStart(2, "0");
+const short = n => n.replace(/^Nghệ sĩ /, "");
+
+function dur(h) {
+  if (h == null) return "–";
+  if (h < 1) return Math.max(1, Math.round(h * 60)) + " phút";
+  if (h < 48) return h.toFixed(1).replace(".", ",") + " giờ";
+  return (h / 24).toFixed(1).replace(".", ",") + " ngày";
+}
+function ago(ts, now) {
+  const s = Math.max(0, Math.round(now - ts));
+  return s < 90 ? s + " giây trước" : Math.round(s / 60) + " phút trước";
+}
+function clock(ts) {
+  const d = new Date(ts * 1000);
+  return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
+}
+function tile(label, value, extra) {
+  return `<div class="tile"><span>${label}</span><b>${value}</b><span>${extra || ""}</span></div>`;
+}
+
+// ---------------- trạng thái: tab đang xem, vị trí con trỏ mỗi bảng (null = mới nhất)
+let last = null, active = (location.hash || "").slice(1);
+const cursorTs = {};
+
+function cycleHtml(b) {
+  const tl = b.tl, A = tl.all || { names: tl.names, v: tl.v }, n = tl.ts.length;
+  const isMe = nm => nm === b.my_name;
+  const head = A.names.map(nm =>
+    `<th class="${isMe(nm) ? "mecol" : ""}">${esc(short(nm))}</th>`).join("");
+  let body = "";
+  for (let i = n - 1; i >= 0; i--) {   // mới nhất ở trên cùng
+    const cells = A.v.map((s, j) => {
+      const v = s[i], p = i > 0 ? s[i - 1] : null, dv = (v != null && p != null) ? v - p : null;
+      return `<td class="${isMe(A.names[j]) ? "mecol" : ""}">${fmt(v)}<small class="${dv > 0 ? "up" : "dim"}">${dv == null ? "" : sgn(dv)}</small></td>`;
+    }).join("");
+    const gap = i > 0 ? `<small class="dim">cách ${Math.round((tl.ts[i] - tl.ts[i - 1]) / 60)} phút</small>` : "";
+    body += `<tr class="${i === n - 1 ? "new" : ""}"><td>${clock(tl.ts[i])}${gap}</td>${cells}</tr>`;
+  }
+  return `<h3>Biến động từng lượt đo</h3>
+    <div class="meta">${n} lượt đo của ${A.names.length} thí sinh, mới nhất ở trên cùng, cột sắp theo hạng hiện tại. Cuộn chuột hoặc kéo thanh cuộn để xem các lượt cũ (kéo ngang nếu bảng rộng). Số nhỏ bên dưới là mức tăng so với lượt trước.</div>
+    <div class="cycbox" tabindex="0"><table class="cyc"><thead><tr><th>Giờ</th>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+}
+
+function boardHtml(b, now) {
+  if (!b.active) {
+    return `<section class="board"><h2>${esc(b.title)}</h2>
+      <div class="err">Chưa có link. Mở config.json, dán link bảng vào mục "url" của bảng này.</div></section>`;
+  }
+  if (b.empty) {
+    return `<section class="board"><h2>${esc(b.title)}</h2>
+      ${b.error ? `<div class="err">${esc(b.error)}</div>` : ""}
+      <div class="meta">Chưa có dữ liệu. Chờ vài phút sau lần chạy đầu tiên của GitHub Actions.</div></section>`;
+  }
+  const next = b.table.filter(r => r.gap != null).slice(-1)[0]; // người sát ngay trên Nam
+  const left = b.deadline ? Math.max(0, (b.deadline - Date.now() / 1000) / 3600) : null;
+  let tiles = tile("Hạng của Nam", "#" + b.my_rank, `trên ${b.table.length} người`)
+    + tile("Số hiện tại", fmt(b.my_votes), `${sgn(b.my_r1)}/giờ (1 giờ qua)`);
+  if (next) {
+    tiles += tile("Cần để vượt " + esc(short(next.name)), fmt(next.gap),
+                  next.need_rate != null ? `≈ ${fmt(next.need_rate)} vote/giờ đến hết hạn` : "");
+    tiles += tile("Dự kiến vượt", next.eta_hours != null ? dur(next.eta_hours) : "chưa kịp",
+                  next.eta_hours != null ? (next.eta_in_time ? "lúc " + clock(next.eta_ts) : "sau hạn chốt") : "nhịp hiện tại chưa đuổi kịp");
+  } else {
+    tiles += tile("Vị trí", "Dẫn đầu", "");
+  }
+  if (left != null) tiles += tile("Còn lại", dur(left), "đến " + clock(b.deadline));
+
+  const rows = b.table.map(r => {
+    let gap = r.gap != null ? `<span class="bad">cần +${fmt(r.gap)}</span>`
+            : r.lead != null ? `<span class="up">hơn ${fmt(r.lead)}</span>` : "";
+    const eta = r.eta_hours != null ? `${dur(r.eta_hours)}${r.eta_in_time ? "" : " (sau hạn)"}`
+              : (r.gap != null ? "–" : "");
+    return `<tr class="${r.me ? "me" : ""}">
+      <td>${r.rank}</td><td>${esc(r.name)}</td><td>${fmt(r.votes)}</td>
+      <td class="${r.r1 > 0 ? "up" : "dim"}">${sgn(r.r1)}</td>
+      <td class="${r.r24 > 0 ? "up" : "dim"}">${sgn(r.r24)}</td>
+      <td>${gap}</td><td>${r.need_rate != null ? fmt(r.need_rate) : ""}</td><td>${eta}</td></tr>`;
+  }).join("");
+
+  let timeline = `<div class="err">Chưa có chuỗi thời gian. Chờ lần đo kế tiếp của workflow.</div>`;
+  if (b.tl && b.tl.ts.length) {
+    const legend = b.tl.names.map((n, i) =>
+      `<span><i style="background:${COLORS[i]}"></i>${esc(short(n))}</span>`).join("");
+    timeline = `<h3>Theo dõi theo thời gian</h3>
+      <div class="meta">Kéo con trỏ trên biểu đồ hoặc thanh trượt để xem số vote và mức tăng tại từng thời điểm.</div>
+      <canvas id="c-${b.id}"></canvas>
+      <div class="slider"><input type="range" id="r-${b.id}" min="0" max="${b.tl.ts.length - 1}" step="1">
+        <button id="n-${b.id}">Mới nhất</button></div>
+      <div class="legend">${legend}</div>
+      <div class="readout" id="ro-${b.id}"></div>
+      ${cycleHtml(b)}`;
+  }
+
+  return `<section class="board" id="b-${b.id}">
+    <h2>${esc(b.title)}</h2>
+    <div class="meta">Cập nhật ${ago(b.updated, now)} · ${b.snapshots} lần đo</div>
+    ${b.error ? `<div class="err">${esc(b.error)}</div>` : ""}
+    <div class="tiles">${tiles}</div>
+    <div class="scroll"><table>
+      <thead><tr><th>#</th><th>Thí sinh</th><th>Số hiện tại</th><th>Tốc độ 1 giờ</th><th>Tốc độ 24 giờ</th>
+        <th>Chênh lệch</th><th>Vote/giờ cần</th><th>Dự kiến vượt</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+    ${timeline}
+    <div class="note">Tốc độ tính từ các lần đo (5 phút/lần), nên có số 1 giờ sau khi chạy đủ 1 giờ, số 24 giờ sau khi chạy đủ 24 giờ.
+      "Vote/giờ cần" đã tính cả việc đối thủ tiếp tục tăng theo nhịp 6 giờ gần nhất.</div>
+  </section>`;
+}
+
+// ---------------- biểu đồ + con trỏ
+function curIndex(b) {
+  const ts = b.tl.ts, t = cursorTs[b.id];
+  if (t == null) return ts.length - 1;
+  let best = 0, bd = Infinity;
+  for (let i = 0; i < ts.length; i++) { const d = Math.abs(ts[i] - t); if (d < bd) { bd = d; best = i; } }
+  return best;
+}
+
+function geom(b, cv) {
+  const W = cv.clientWidth, H = cv.clientHeight, tl = b.tl;
+  let x0 = tl.ts[0], x1 = tl.ts[tl.ts.length - 1];
+  const vals = tl.v.flat().filter(v => v != null);
+  let y0 = Math.min(...vals), y1 = Math.max(...vals);
+  if (x1 === x0) x1 = x0 + 60;
+  if (y1 === y0) { y1 += 1; y0 -= 1; }
+  const padY = (y1 - y0) * 0.08; y0 -= padY; y1 += padY;
+  const L = 58, R = 10, T = 8, B = 22;
+  return { W, H, x0, x1, y0, y1, L, R, T, B,
+           X: t => L + (t - x0) / (x1 - x0) * (W - L - R),
+           Y: v => T + (1 - (v - y0) / (y1 - y0)) * (H - T - B) };
+}
+
+function drawChart(b) {
+  const cv = document.getElementById("c-" + b.id);
+  if (!cv || !b.tl) return;
+  const dpr = window.devicePixelRatio || 1, tl = b.tl;
+  const W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext("2d"); g.scale(dpr, dpr);
+  const css = getComputedStyle(document.documentElement);
+  const muted = css.getPropertyValue("--muted").trim(), line = css.getPropertyValue("--line").trim();
+  const G = geom(b, cv);
+  g.fillStyle = css.getPropertyValue("--card").trim(); g.fillRect(0, 0, W, H);
+  g.font = "11px system-ui"; g.fillStyle = muted; g.strokeStyle = line; g.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const v = G.y0 + (G.y1 - G.y0) * i / 4, y = G.Y(v);
+    g.beginPath(); g.moveTo(G.L, y); g.lineTo(W - G.R, y); g.stroke();
+    g.textAlign = "right"; g.fillText(Math.round(v).toLocaleString("vi-VN"), G.L - 6, y + 4);
+  }
+  [0, 0.5, 1].forEach(f => {
+    g.textAlign = f === 0 ? "left" : f === 1 ? "right" : "center";
+    g.fillText(clock(G.x0 + (G.x1 - G.x0) * f), G.L + f * (W - G.L - G.R), H - 6);
+  });
+  tl.v.forEach((s, j) => {
+    g.strokeStyle = COLORS[j]; g.lineWidth = j === 0 ? 2.6 : 1.6; g.beginPath();
+    let pen = false;
+    s.forEach((v, k) => {
+      if (v == null) { pen = false; return; }
+      pen ? g.lineTo(G.X(tl.ts[k]), G.Y(v)) : g.moveTo(G.X(tl.ts[k]), G.Y(v)); pen = true;
+    });
+    g.stroke();
+  });
+  // con trỏ
+  const i = curIndex(b), cx = G.X(tl.ts[i]);
+  g.strokeStyle = muted; g.lineWidth = 1; g.setLineDash([4, 3]);
+  g.beginPath(); g.moveTo(cx, G.T); g.lineTo(cx, H - G.B); g.stroke(); g.setLineDash([]);
+  tl.v.forEach((s, j) => {
+    if (s[i] == null) return;
+    g.fillStyle = COLORS[j]; g.beginPath(); g.arc(cx, G.Y(s[i]), 4, 0, 7); g.fill();
+    g.strokeStyle = css.getPropertyValue("--card").trim(); g.lineWidth = 1.5; g.stroke();
+  });
+}
+
+function readout(b) {
+  const el = document.getElementById("ro-" + b.id);
+  if (!el || !b.tl) return;
+  const tl = b.tl, i = curIndex(b), t = tl.ts[i];
+  // mốc so sánh: lượt đo gần nhất cách ít nhất ~55 phút trước, nếu chưa có thì lượt đầu
+  let k = 0;
+  for (let q = i; q >= 0; q--) { if (t - tl.ts[q] >= 3300) { k = q; break; } }
+  const winMin = Math.round((t - tl.ts[k]) / 60);
+  const prevGap = i > 0 ? Math.round((t - tl.ts[i - 1]) / 60) : null;
+  const me = tl.v[0][i];
+  const cards = tl.names.map((n, j) => {
+    const v = tl.v[j][i];
+    const d1 = (i > 0 && v != null && tl.v[j][i - 1] != null) ? v - tl.v[j][i - 1] : null;
+    const dw = (i > k && v != null && tl.v[j][k] != null) ? v - tl.v[j][k] : null;
+    let vs = "";
+    if (j > 0 && v != null && me != null) vs = v > me ? `Nam kém ${fmt(v - me)}` : `Nam hơn ${fmt(me - v)}`;
+    return `<div class="rc ${j === 0 ? "me" : ""}" style="border-top-color:${COLORS[j]}">
+      <span>${esc(short(n))}</span><b>${fmt(v)}</b>
+      <small class="${d1 > 0 ? "up" : "dim"}">${d1 == null ? "–" : sgn(d1)} so với lượt trước${prevGap ? ` (${prevGap} phút)` : ""}</small>
+      <small class="${dw > 0 ? "up" : "dim"}">${dw == null ? "–" : sgn(dw)} trong ${winMin >= 60 ? "1 giờ" : winMin + " phút"} trước đó</small>
+      ${vs ? `<small class="dim">${vs}</small>` : ""}</div>`;
+  }).join("");
+  el.innerHTML = `<div class="meta" style="grid-column:1/-1;margin:0">Thời điểm: <b>${clock(t)}</b>${i === tl.ts.length - 1 ? " (mới nhất)" : ""}</div>` + cards;
+  const r = document.getElementById("r-" + b.id); if (r) r.value = i;
+}
+
+function setCursor(b, i) {
+  i = Math.max(0, Math.min(b.tl.ts.length - 1, i));
+  cursorTs[b.id] = i === b.tl.ts.length - 1 ? null : b.tl.ts[i];
+  drawChart(b); readout(b);
+}
+
+function bindBoard(b) {
+  if (!b.tl) return;
+  const cv = document.getElementById("c-" + b.id), r = document.getElementById("r-" + b.id),
+        nb = document.getElementById("n-" + b.id);
+  if (!cv) return;
+  const pick = ev => {
+    const G = geom(b, cv), rect = cv.getBoundingClientRect();
+    const t = G.x0 + (ev.clientX - rect.left - G.L) / (G.W - G.L - G.R) * (G.x1 - G.x0);
+    let best = 0, bd = Infinity;
+    b.tl.ts.forEach((x, q) => { const d = Math.abs(x - t); if (d < bd) { bd = d; best = q; } });
+    setCursor(b, best);
+  };
+  let down = false;
+  cv.addEventListener("pointerdown", e => { down = true; cv.setPointerCapture(e.pointerId); pick(e); });
+  cv.addEventListener("pointermove", e => { if (down) pick(e); });
+  cv.addEventListener("pointerup", () => down = false);
+  cv.addEventListener("pointercancel", () => down = false);
+  r.addEventListener("input", () => setCursor(b, +r.value));
+  nb.addEventListener("click", () => setCursor(b, b.tl.ts.length - 1));
+  drawChart(b); readout(b);
+}
+
+// ---------------- vẽ trang
+function render() {
+  if (!last) return;
+  const boards = last.boards;
+  if (!boards.some(b => b.id === active)) active = boards[0].id;
+  document.getElementById("tabs").innerHTML = boards.map(b => {
+    const label = esc(b.title.split(" - ")[0]);
+    const rk = b.active && !b.empty && b.my_rank ? `<b>#${b.my_rank}</b>` : "";
+    return `<button class="tab ${b.id === active ? "on" : ""}" data-id="${b.id}">${label}${rk}</button>`;
+  }).join("");
+  document.querySelectorAll(".tab").forEach(el => el.addEventListener("click", () => {
+    active = el.dataset.id; history.replaceState(null, "", "#" + active); render();
+  }));
+  const b = boards.find(x => x.id === active);
+  const box = document.querySelector(".cycbox");
+  const keep = box ? { id: box.closest(".board").id, top: box.scrollTop, left: box.scrollLeft } : null;
+  document.getElementById("boards").innerHTML = boardHtml(b, Date.now() / 1000);
+  const nb = document.querySelector(".cycbox");
+  if (keep && nb && nb.closest(".board").id === keep.id) { nb.scrollTop = keep.top; nb.scrollLeft = keep.left; }
+  if (b.active && !b.empty) bindBoard(b);
+}
+
+async function load() {
+  try {
+    const r = await fetch("data.json?t=" + Date.now(), {cache: "no-store"});
+    last = await r.json();
+    render();
+    document.getElementById("title").textContent = "Theo dõi vote: " + last.target;
+    document.getElementById("status").textContent = "Số liệu cập nhật khoảng 5 phút/lần, trang tự làm mới mỗi phút · " + new Date().toLocaleTimeString("vi-VN");
+  } catch (e) {
+    document.getElementById("status").textContent = "Chưa tải được số liệu. Nếu vừa cài xong, chờ vài phút để lần chạy đầu tiên hoàn tất.";
+  }
+}
+load(); setInterval(load, 60000);
+window.addEventListener("resize", () => {
+  if (!last) return; const b = last.boards.find(x => x.id === active);
+  if (b && b.tl) drawChart(b);
+});
+</script>
+</body>
+</html>
