@@ -1,0 +1,70 @@
+name: track-votes
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: track-votes
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pages: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cai trinh duyet an
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Lay so vote va dung trang web
+        run: python collect.py
+
+      - name: Luu lich su va trang web vao repo
+        run: |
+          git config user.name "vote-bot"
+          git config user.email "vote-bot@users.noreply.github.com"
+          cat > /tmp/merge.py <<'PY'
+          import sys
+          mine, theirs = sys.argv[1], sys.argv[2]
+          seen, out = set(), []
+          for p in (theirs, mine):
+              for line in open(p, encoding="utf-8"):
+                  line = line.rstrip("\n")
+                  if line and line not in seen:
+                      seen.add(line)
+                      out.append(line)
+          open("data/history.jsonl", "w", encoding="utf-8").write("\n".join(out) + "\n")
+          PY
+          git add data/history.jsonl docs/data.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "vote snapshot"
+          for i in 1 2 3; do
+            git push && exit 0
+            cp data/history.jsonl /tmp/mine.jsonl
+            git fetch origin main
+            git reset --hard origin/main
+            python /tmp/merge.py /tmp/mine.jsonl data/history.jsonl
+            python -c "import collect; collect.write_site({})"
+            git add data/history.jsonl docs/data.json
+            git commit -m "vote snapshot (merged)" || true
+          done
+          exit 1
+
+      - name: Yeu cau GitHub dung lai trang (du phong)
+        continue-on-error: true
+        run: |
+          curl -s -o /dev/null -w "%{http_code}\n" -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/pages/builds
